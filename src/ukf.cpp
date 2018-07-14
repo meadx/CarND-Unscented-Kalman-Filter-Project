@@ -13,7 +13,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
+  use_laser_ = false; // ToDo: SET TO TRUE WHEN LASER UPDATE IS POSSIBLE
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -109,26 +109,26 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     P_(3,3) = 0.0 // psi
     P_(4,4) = 0.0 // psi_dot
 
-    if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       // Convert radar from polar to cartesian coordinates and initialize state.
       // Source: https://www.mathsisfun.com/polar-cartesian-coordinates.html
-      float rho = measurement_pack.raw_measurements_(0);
-      float phi = measurement_pack.raw_measurements_(1);
+      float rho = meas_package.raw_measurements_(0);
+      float phi = meas_package.raw_measurements_(1);
       x_(0) = rho * cos(phi); // px
       x_(1) = rho * sin(phi); // py
       x_(2) = 0; // vx
       x_(3) = 0; // vy
     }
-    else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
+    else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
       //Initialize state
-      x_(0) = measurement_pack.raw_measurements_(0); // px
-      x_(1) = measurement_pack.raw_measurements_(1); // py
+      x_(0) = meas_package.raw_measurements_(0); // px
+      x_(1) = meas_package.raw_measurements_(1); // py
       x_(2) = 0; // vx
       x_(3) = 0; // vy
     }
 
     // done initializing, no need to predict or update
-    time_us_ = measurement_pack.timestamp_;
+    time_us_ = meas_package.timestamp_;
     is_initialized_ = true;
     return;
 }
@@ -285,6 +285,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   You'll also need to calculate the radar NIS.
   */
   
+  // 1. Predict Measurement ############################################################
+  
+  //set measurement dimension, radar can measure r, phi, and r_dot
+  int n_z = 3;
+  
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   
   //transform sigma points into measurement space
@@ -328,8 +333,53 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z,n_z);
-  R <<    std_radr*std_radr, 0, 0,
-          0, std_radphi*std_radphi, 0,
-          0, 0,std_radrd*std_radrd;
+  R <<    std_radr_*std_radr_, 0, 0,
+          0, std_radphi_*std_radphi_, 0,
+          0, 0,std_radrd_*std_radrd_;
   S = S + R;
+  
+  // 2. Update State ############################################################
+  
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+  
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug + 1; i++) {  //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    //angle normalization
+    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
+    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+
+    // state difference
+    VectorXd x_diff = Xsig_pred.col(i) - x;
+    //angle normalization
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+
+    Tc = Tc + weights(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+  
+  //create vector for incoming radar measurement
+  VectorXd z = VectorXd(n_z);
+  z <<
+      meas_package.raw_measurements_(0),
+      meas_package.raw_measurements_(1),
+      meas_package.raw_measurements_(2);
+
+  //residual
+  VectorXd z_diff = z - z_pred;
+
+  //angle normalization
+  while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
+  while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+
+  //update state mean and covariance matrix
+  x_ = x_ + K * z_diff;
+  P_ = P_ - K*S*K.transpose();
 }
