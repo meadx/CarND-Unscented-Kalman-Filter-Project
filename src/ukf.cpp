@@ -54,6 +54,19 @@ UKF::UKF() {
 
   Hint: one or more values initialized above might be wildly off...
   */
+  
+  // initial state vector
+  // px and py unknown - ToDo: Tune 3rd-5th value
+  x <<   0.0, 0.0, 0.0, 0.0, 0.0;
+  
+  // initial covariance matrix - ToDo: tune values
+  P_.fill(0.0);
+  P_(0,0) = 0.0 // px
+  P_(1,1) = 0.0 // py
+  P_(2,2) = 0.0 // v
+  P_(3,3) = 0.0 // psi
+  P_(4,4) = 0.0 // psi_dot
+  
 }
 
 UKF::~UKF() {}
