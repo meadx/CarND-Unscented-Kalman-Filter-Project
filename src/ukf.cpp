@@ -99,7 +99,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // first measurement
     // initial state vector
     // px and py unknown - ToDo: Tune 3rd-5th value
-    x_ <<   0.0, 0.0, 0.0, 0.0, 0.0;
+    x_.fill(0.0);
 
     // initial covariance matrix - ToDo: tune values
     P_.fill(0.0);
@@ -109,10 +109,12 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
         // Source: https://www.mathsisfun.com/polar-cartesian-coordinates.html
         float rho = meas_package.raw_measurements_(0);
         float phi = meas_package.raw_measurements_(1);
+        float rho_dot = meas_package.raw_measurements_(2);
         x_(0) = rho * cos(phi); // px
         x_(1) = rho * sin(phi); // py
-        x_(2) = 0; // vx
-        x_(3) = 0; // vy
+        x_(2) = 1.0; // v
+        x_(3) = rhodot * cos(phi); // psi
+        x_(4) = rhodot * sin(phi); // psi_dot
 
         P_(0,0) = std_radr_*std_radr_; // px
         P_(1,1) = std_radr_*std_radr_; // py
@@ -124,8 +126,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
         //Initialize state
         x_(0) = meas_package.raw_measurements_(0); // px
         x_(1) = meas_package.raw_measurements_(1); // py
-        x_(2) = 0; // vx
-        x_(3) = 0; // vy
+        x_(2) = 1.0; // v
+        x_(3) = 1.0; // psi
+        x_(4) = 1.0; // psi_dot 
         
         P_(0,0) = std_laspx_*std_laspx_; // px
         P_(1,1) = std_laspy_*std_laspy_; // py
@@ -207,7 +210,8 @@ void UKF::Prediction(double delta_t) {
   {
     //extract values for better readability
     double p_x = Xsig_aug(0,i);
-    double p_y = Xsig_aug(1,i);double v = Xsig_aug(2,i);
+    double p_y = Xsig_aug(1,i);
+    double v = Xsig_aug(2,i);
     double yaw = Xsig_aug(3,i);
     double yawd = Xsig_aug(4,i);
     double nu_a = Xsig_aug(5,i);
@@ -296,7 +300,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   int n_z = 2;
   
   MatrixXd Zsig = MatrixXd(2, 15);
- 
+  Zsig.fill(0.0);
   //transform sigma points into measurement space
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
 
@@ -402,6 +406,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   int n_z = 3;
   
   MatrixXd Zsig = MatrixXd(3, 15);
+  Zsig.fill(0.0);
   //transform sigma points into measurement space
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
 
@@ -492,4 +497,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
+  
+  //NIS
+  //ToDo
 }
