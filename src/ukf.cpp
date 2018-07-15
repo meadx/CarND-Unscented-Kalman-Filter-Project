@@ -103,28 +103,35 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
     // initial covariance matrix - ToDo: tune values
     P_.fill(0.0);
-    P_(0,0) = 0.0; // px
-    P_(1,1) = 0.0; // py
-    P_(2,2) = 0.0; // v
-    P_(3,3) = 0.0; // psi
-    P_(4,4) = 0.0; // psi_dot
 
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
-      // Convert radar from polar to cartesian coordinates and initialize state.
-      // Source: https://www.mathsisfun.com/polar-cartesian-coordinates.html
-      float rho = meas_package.raw_measurements_(0);
-      float phi = meas_package.raw_measurements_(1);
-      x_(0) = rho * cos(phi); // px
-      x_(1) = rho * sin(phi); // py
-      x_(2) = 0; // vx
-      x_(3) = 0; // vy
+        // Convert radar from polar to cartesian coordinates and initialize state.
+        // Source: https://www.mathsisfun.com/polar-cartesian-coordinates.html
+        float rho = meas_package.raw_measurements_(0);
+        float phi = meas_package.raw_measurements_(1);
+        x_(0) = rho * cos(phi); // px
+        x_(1) = rho * sin(phi); // py
+        x_(2) = 0; // vx
+        x_(3) = 0; // vy
+
+        P_(0,0) = std_radr_*std_radr_; // px
+        P_(1,1) = std_radr_*std_radr_; // py
+        P_(2,2) = 1.0; // v
+        P_(3,3) = std_radphi_*std_radphi_; // psi
+        P_(4,4) = std_radrd_*std_radrd_; // psi_dot
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      //Initialize state
-      x_(0) = meas_package.raw_measurements_(0); // px
-      x_(1) = meas_package.raw_measurements_(1); // py
-      x_(2) = 0; // vx
-      x_(3) = 0; // vy
+        //Initialize state
+        x_(0) = meas_package.raw_measurements_(0); // px
+        x_(1) = meas_package.raw_measurements_(1); // py
+        x_(2) = 0; // vx
+        x_(3) = 0; // vy
+        
+        P_(0,0) = std_laspx_*std_laspx_; // px
+        P_(1,1) = std_laspy_*std_laspy_; // py
+        P_(2,2) = 1.0; // v
+        P_(3,3) = 1.0; // psi
+        P_(4,4) = 1.0; // psi_dot
     }
 
     // done initializing, no need to predict or update
